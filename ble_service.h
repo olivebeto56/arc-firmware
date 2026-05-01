@@ -15,7 +15,8 @@
 #include <Arduino.h>
 #include "sensor.h"
 
-// Bring the BLE stack up and start advertising as BLE_LOCAL_NAME.
+// Bring the BLE stack up and start advertising as `SportBand-XXXX`,
+// where XXXX are 4 hex chars derived from the nRF52840 factory DEVICEID.
 // Returns true on success.
 bool bleInit();
 
@@ -24,6 +25,11 @@ void blePoll();
 
 // True while a central is connected. Cheap; safe to call frequently.
 bool bleConnected();
+
+// Returns the BLE local name built at boot (e.g. "SportBand-A3F2").
+// Stable across resets — derived from the nRF52840 factory DEVICEID.
+// Returns an empty string until bleInit() has run.
+const char* bleGetLocalName();
 
 // Pack `data` as the 22-byte v3 packet and notify subscribers.
 // session_start_ms lets us send a 16-bit timestamp relative to session start

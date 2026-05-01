@@ -1,8 +1,10 @@
 # running_node — Sprint 1 firmware
 
 Firmware del nodo de tobillo para el prototipo de running. Un único sketch `.ino`
-que se flashea dos veces (cambiando `NODE_SIDE` entre LEFT y RIGHT) para producir
-las dos bandas `SportBand-L` y `SportBand-R`.
+que se flashea **idéntico** en las dos bandas. Cada banda genera en boot su
+propio nombre BLE `SportBand-XXXX` a partir del chip ID único del nRF52840
+(`NRF_FICR->DEVICEID`); la asignación de pie izquierdo/derecho la hace la app
+durante el pairing.
 
 ## Hardware
 
@@ -24,22 +26,34 @@ las dos bandas `SportBand-L` y `SportBand-R`.
 
 ## Flashear los dos nodos
 
-1. En `config.h` deja `NODE_SIDE NODE_SIDE_LEFT`, conecta el primer XIAO, sube.
-2. Cambia a `NODE_SIDE NODE_SIDE_RIGHT`, conecta el segundo XIAO, sube.
-3. Verifica en el Serial Monitor (115200 bps):
+El sketch es **idéntico** para las dos bandas — no hay nada que editar entre
+uploads. Cada banda genera su propio nombre BLE en boot a partir del chip ID
+único del nRF52840 (formato `SportBand-XXXX`, 4 hex chars).
+
+1. Conecta el primer XIAO por USB-C → *Tools → Board → Seeed XIAO BLE Sense -
+   nRF52840* → Upload.
+2. Verifica en el Serial Monitor (115200 bps):
    ```
-   [main] AI Sport Monitor — node LEFT_ANKLE
-   [main] BLE name: SportBand-L
-   [sensor] BNO085 ready (9-axis ARVR + linear accel)
-   [ble] advertising as SportBand-L
+   [main] AI Sport Monitor — running node booting
+   [sensor] BNO085 ready (9-axis ARVR + linear accel + calibrated gyro)
+   [ble] advertising as SportBand-A3F2
    [main] ready
    ```
+3. Apunta el sufijo (`A3F2` en el ejemplo) y márcalo físicamente en la banda
+   con rotulador o pegatina. **Hazlo ahora** — luego, dentro de la carcasa,
+   no hay forma de distinguirlas a simple vista sin reconectar por USB.
+4. Desconecta y repite con la segunda banda. Tendrá un sufijo distinto
+   (probabilidad de colisión ≈ 1/65536).
+
+> La asignación de pie izquierdo/derecho se hace en la app durante el pairing
+> ("agita la del tobillo izquierdo"). El firmware no conoce su lado.
 
 ## Comprobar con un escáner BLE
 
 Antes de tener la app Flutter lista, usa **nRF Connect** (Android/iOS):
 
-- Buscas dos peripherals `SportBand-L` y `SportBand-R`.
+- Buscas dos peripherals con nombres `SportBand-XXXX` y `SportBand-YYYY`
+  (cada banda tiene su sufijo único).
 - Servicio `19B10000-…`, tres caracteristicas:
   - `19B10001` (NOTIFY) — al suscribirte deberías ver paquetes de 22 bytes a 100 Hz.
   - `19B10002` (READ/NOTIFY) — un byte con `%` de batería.
@@ -85,6 +99,10 @@ El firmware emite siempre v3. Los parsers cliente deben degradar por
   necesario para tracking estable de yaw. Sin él, en 30 s el dato deriva.
 - **Abstracción `getSensorAngles()`.** El BLE no sabe que hay un BNO085 detrás —
   cuando migremos a PCB propio, sólo se reemplaza `sensor.cpp`.
+- **Identidad runtime (chip ID).** El firmware es idéntico en las dos bandas;
+  el sufijo del nombre BLE viene del `NRF_FICR->DEVICEID` factory-burned. La
+  asignación de pie/lado vive en la app, no en el firmware — esto generaliza
+  a multi-deporte (golf con muñeca + cadera, gym con muñeca + tobillo, etc.).
 - **Re-advertising automático en disconnect.** El nodo nunca queda “muerto” tras
   perder la conexión — vuelve a anunciarse de inmediato.
 - **Reset del timestamp al reconectar.** La app detecta saltos en `timestamp_ms`

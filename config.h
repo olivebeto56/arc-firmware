@@ -2,8 +2,8 @@
 //  config.h — AI Sport Monitor / running node
 //  XIAO nRF52840 Sense + BNO085 + LiPo 400mAh
 //
-//  Shared configuration: BLE UUIDs, pin map, sample rate, node identity.
-//  Change NODE_SIDE between LEFT and RIGHT before flashing each unit.
+//  Shared configuration: BLE UUIDs, pin map, sample rate. Identity is built
+//  at runtime — both bands run an identical binary.
 // ============================================================================
 #ifndef CONFIG_H
 #define CONFIG_H
@@ -11,24 +11,13 @@
 #include <Arduino.h>
 
 // ---------------------------------------------------------------------------
-//  Node identity  ── change this single line per physical node, then reflash
+//  Node identity — runtime, derived from nRF52840 FICR DEVICEID
 // ---------------------------------------------------------------------------
-#define NODE_SIDE_LEFT   0
-#define NODE_SIDE_RIGHT  1
-
-#ifndef NODE_SIDE
-  #define NODE_SIDE  NODE_SIDE_LEFT     // <-- set to NODE_SIDE_RIGHT for the other ankle
-#endif
-
-#if NODE_SIDE == NODE_SIDE_LEFT
-  #define NODE_ID         "LEFT_ANKLE"
-  #define BLE_LOCAL_NAME  "SportBand-L"
-#elif NODE_SIDE == NODE_SIDE_RIGHT
-  #define NODE_ID         "RIGHT_ANKLE"
-  #define BLE_LOCAL_NAME  "SportBand-R"
-#else
-  #error "NODE_SIDE must be NODE_SIDE_LEFT or NODE_SIDE_RIGHT"
-#endif
+//  Both bands run an identical binary. The BLE local name is built at boot
+//  as "SportBand-XXXX" where XXXX are the lowest 16 bits of the chip's
+//  factory-burned unique ID (nRF52840 FICR DEVICEID, 64 bits, immutable).
+//  The L/R assignment lives in the app's pairing flow ("shake the left band").
+#define BLE_NAME_PREFIX  "SportBand-"
 
 // ---------------------------------------------------------------------------
 //  Sampling

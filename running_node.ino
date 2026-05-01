@@ -2,9 +2,10 @@
 //  running_node.ino — AI Sport Monitor
 //  Sprint 1 firmware for the running node (XIAO nRF52840 Sense + BNO085).
 //
-//  Single sketch, swap NODE_SIDE in config.h between LEFT and RIGHT before
-//  flashing each unit. Runs the IMU + BLE pipeline at 100 Hz and reports
-//  battery percent every 10 s.
+//  Single sketch, identical binary on both bands. Each node derives a unique
+//  BLE name (`SportBand-XXXX`) from its nRF52840 factory DEVICEID at boot;
+//  the app's pairing flow assigns left/right roles. Runs the IMU + BLE
+//  pipeline at 100 Hz and reports battery percent every 10 s.
 //
 //  Required Arduino libraries:
 //    - Adafruit BNO08x      (and its deps: Adafruit BusIO, Adafruit Unified Sensor)
@@ -68,10 +69,7 @@ void setup() {
   while (!Serial && (millis() - t0) < 1500) { delay(10); }
 
   Serial.println();
-  Serial.print(F("[main] AI Sport Monitor — node "));
-  Serial.println(NODE_ID);
-  Serial.print(F("[main] BLE name: "));
-  Serial.println(BLE_LOCAL_NAME);
+  Serial.println(F("[main] AI Sport Monitor — running node booting"));
 
   // I2C must be brought up before sensorInit().
   Wire.begin();

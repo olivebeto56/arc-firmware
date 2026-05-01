@@ -9,6 +9,7 @@
 #include "config.h"
 
 #include <ArduinoBLE.h>
+#include <nrf.h>
 
 // Service + characteristics. The sensor characteristic carries 22 bytes (v3)
 // per notify; ArduinoBLE will negotiate MTU automatically and split if needed.
@@ -27,6 +28,18 @@ static BLEByteCharacteristic    configChar(
 
 // Packed buffer used as the source for every notify. Static to avoid stack churn.
 static uint8_t sensorPacket[SENSOR_PACKET_SIZE];
+
+// Runtime-built BLE local name, "SportBand-XXXX\0". 15 chars + null, rounded.
+static char g_bleName[16];
+
+// Take the lower 16 bits of DEVICEID[1] as a compact, stable identifier.
+// The full DEVICEID is 64 bits factory-burned; 16 bits gives 65536 combinations
+// — enough to disambiguate the two bands a single user owns (collision ≈ 1/65536).
+// Bump the mask to 0xFFFFF / 0xFFFFFF if a wider suffix is ever needed.
+static void buildBleName() {
+  uint16_t suffix = (uint16_t)(NRF_FICR->DEVICEID[1] & 0xFFFF);
+  snprintf(g_bleName, sizeof(g_bleName), BLE_NAME_PREFIX "%04X", suffix);
+}
 
 // ---------------------------------------------------------------------------
 //  Connection callbacks — restart advertising on disconnect
@@ -52,8 +65,9 @@ bool bleInit() {
     return false;
   }
 
-  BLE.setLocalName(BLE_LOCAL_NAME);
-  BLE.setDeviceName(BLE_LOCAL_NAME);
+  buildBleName();
+  BLE.setLocalName(g_bleName);
+  BLE.setDeviceName(g_bleName);
   BLE.setAdvertisedService(sportService);
 
   // Default values
@@ -76,8 +90,12 @@ bool bleInit() {
   }
 
   Serial.print(F("[ble] advertising as "));
-  Serial.println(BLE_LOCAL_NAME);
+  Serial.println(g_bleName);
   return true;
+}
+
+const char* bleGetLocalName() {
+  return g_bleName;
 }
 
 void blePoll() {
