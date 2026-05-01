@@ -10,7 +10,7 @@
 
 #include <ArduinoBLE.h>
 
-// Service + characteristics. The sensor characteristic carries 16 bytes
+// Service + characteristics. The sensor characteristic carries 22 bytes (v3)
 // per notify; ArduinoBLE will negotiate MTU automatically and split if needed.
 static BLEService               sportService(BLE_SERVICE_UUID);
 static BLECharacteristic        sensorChar(
@@ -127,6 +127,11 @@ void bleSendSensor(const SensorData& data, uint32_t session_start_ms) {
   int16_t ay = sat_i16(data.ay * MS2_TO_MILLIG);
   int16_t az = sat_i16(data.az * MS2_TO_MILLIG);
 
+  // Gyroscope (calibrated, °/s) — scaled by GYRO_SCALE to int16.
+  int16_t gx = sat_i16(data.gx * GYRO_SCALE);
+  int16_t gy = sat_i16(data.gy * GYRO_SCALE);
+  int16_t gz = sat_i16(data.gz * GYRO_SCALE);
+
   put_u16_le(&sensorPacket[0],  ts);
   put_i16_le(&sensorPacket[2],  qw);
   put_i16_le(&sensorPacket[4],  qx);
@@ -135,6 +140,9 @@ void bleSendSensor(const SensorData& data, uint32_t session_start_ms) {
   put_i16_le(&sensorPacket[10], ax);
   put_i16_le(&sensorPacket[12], ay);
   put_i16_le(&sensorPacket[14], az);
+  put_i16_le(&sensorPacket[16], gx);
+  put_i16_le(&sensorPacket[18], gy);
+  put_i16_le(&sensorPacket[20], gz);
 
   // writeValue on a NOTIFY char queues a notify to subscribed centrals.
   sensorChar.writeValue(sensorPacket, SENSOR_PACKET_SIZE);

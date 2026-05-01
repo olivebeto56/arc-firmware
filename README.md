@@ -41,24 +41,43 @@ Antes de tener la app Flutter lista, usa **nRF Connect** (Android/iOS):
 
 - Buscas dos peripherals `SportBand-L` y `SportBand-R`.
 - Servicio `19B10000-…`, tres caracteristicas:
-  - `19B10001` (NOTIFY) — al suscribirte deberías ver paquetes de 16 bytes a 100 Hz.
+  - `19B10001` (NOTIFY) — al suscribirte deberías ver paquetes de 22 bytes a 100 Hz.
   - `19B10002` (READ/NOTIFY) — un byte con `%` de batería.
   - `19B10003` (WRITE) — reservado para configurar sample rate.
 
-## Formato del paquete sensor (16 bytes, little-endian)
+## Formato del paquete sensor (v3, 22 bytes, little-endian)
 
-| Offset | Tipo  | Campo            | Escala         |
-|-------:|-------|------------------|----------------|
+| Offset | Tipo  | Campo            | Escala                          |
+|-------:|-------|------------------|---------------------------------|
 | 0–1    | u16   | timestamp_ms     | ms desde inicio sesión (wraps ~65 s) |
-| 2–3    | i16   | qw               | × 10000        |
-| 4–5    | i16   | qx               | × 10000        |
-| 6–7    | i16   | qy               | × 10000        |
-| 8–9    | i16   | qz               | × 10000        |
-| 10–11  | i16   | accel_x          | milli-g        |
-| 12–13  | i16   | accel_y          | milli-g        |
-| 14–15  | i16   | accel_z          | milli-g        |
+| 2–3    | i16   | qw               | × `QUAT_SCALE` (10000)          |
+| 4–5    | i16   | qx               | × `QUAT_SCALE` (10000)          |
+| 6–7    | i16   | qy               | × `QUAT_SCALE` (10000)          |
+| 8–9    | i16   | qz               | × `QUAT_SCALE` (10000)          |
+| 10–11  | i16   | accel_x          | milli-g                         |
+| 12–13  | i16   | accel_y          | milli-g                         |
+| 14–15  | i16   | accel_z          | milli-g                         |
+| 16–17  | i16   | gyro_x           | × `GYRO_SCALE` (°/s)            |
+| 18–19  | i16   | gyro_y           | × `GYRO_SCALE` (°/s)            |
+| 20–21  | i16   | gyro_z           | × `GYRO_SCALE` (°/s)            |
 
-> En la app, accel se reconvierte a m/s² con `× 9.80665 / 1000`.
+> En la app, accel se reconvierte a m/s² con `× 9.80665 / 1000`, y gyro a °/s
+> dividiendo entre `GYRO_SCALE`.
+
+`GYRO_SCALE` está definido en `config.h`. Por defecto vale **100** (rango
+±327 °/s, running/gym). Para análisis de golf se baja a **10** (rango
+±3270 °/s, swing en muñeca) — mantener firmware y app en sync.
+
+### Compatibilidad con versiones anteriores (parser-side)
+
+El firmware emite siempre v3. Los parsers cliente deben degradar por
+`bytes.length` y nunca lanzar excepción por packets cortos:
+
+| Versión | Tamaño | Contenido                            |
+|--------:|-------:|--------------------------------------|
+| v1      | 14 B   | timestamp + quat + accel_x/y (sin accel_z, sin gyro) |
+| v2      | 16 B   | timestamp + quat + accel completo (sin gyro) |
+| v3      | 22 B   | v2 + gyro_x/y/z (formato actual)     |
 
 ## Decisiones de diseño
 

@@ -69,23 +69,36 @@ static const float    VBAT_EMPTY_V        = 3.30f;
 //  BLE UUIDs (must match Flutter app exactly — do not edit)
 // ---------------------------------------------------------------------------
 #define BLE_SERVICE_UUID         "19B10000-E8F2-537E-4F6C-D104768A1214"
-#define BLE_CHAR_SENSOR_UUID     "19B10001-E8F2-537E-4F6C-D104768A1214"  // NOTIFY, 16 B
+#define BLE_CHAR_SENSOR_UUID     "19B10001-E8F2-537E-4F6C-D104768A1214"  // NOTIFY, 22 B (v3)
 #define BLE_CHAR_BATTERY_UUID    "19B10002-E8F2-537E-4F6C-D104768A1214"  // READ,    1 B
 #define BLE_CHAR_CONFIG_UUID     "19B10003-E8F2-537E-4F6C-D104768A1214"  // WRITE,   1 B
 
-// Sensor packet (v2): 16 bytes, little-endian.
+// Sensor packet (v3): 22 bytes, little-endian. Firmware always emits v3.
 //  [0..1]   uint16  timestamp_ms (relative to session start, wraps at ~65 s)
-//  [2..3]   int16   qw * 10000
-//  [4..5]   int16   qx * 10000
-//  [6..7]   int16   qy * 10000
-//  [8..9]   int16   qz * 10000
+//  [2..3]   int16   qw * QUAT_SCALE
+//  [4..5]   int16   qx * QUAT_SCALE
+//  [6..7]   int16   qy * QUAT_SCALE
+//  [8..9]   int16   qz * QUAT_SCALE
 //  [10..11] int16   accel_x (milli-g)
 //  [12..13] int16   accel_y (milli-g)
 //  [14..15] int16   accel_z (milli-g)
-static const uint8_t SENSOR_PACKET_SIZE   = 16;
+//  [16..17] int16   gyro_x  * GYRO_SCALE  (°/s)
+//  [18..19] int16   gyro_y  * GYRO_SCALE  (°/s)
+//  [20..21] int16   gyro_z  * GYRO_SCALE  (°/s)
+//
+// Legacy formats (parser-side only; the firmware no longer emits them):
+//   v1 = 14 B (no accel_z, no gyro)
+//   v2 = 16 B (no gyro)
+// Clients must degrade by bytes.length and never throw on shorter packets.
+static const uint8_t SENSOR_PACKET_SIZE   = 22;
 
 // Quaternion + accel scale factors (mirrored on the app side).
 static const float   QUAT_SCALE           = 10000.0f;
 static const float   ACCEL_SCALE_MILLI_G  = 1000.0f;   // m/s² → milli-g uses g=9.80665
+
+// Gyroscope scale: int16 = gyro_dps * GYRO_SCALE.
+// 100 → range ±327 °/s with 0.01 °/s resolution → covers running and gym.
+// For golf (peaks ~2000 °/s on the wrist) drop to 10 — keep firmware and app in sync.
+static const float   GYRO_SCALE           = 100.0f;
 
 #endif // CONFIG_H

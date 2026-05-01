@@ -24,6 +24,11 @@ struct SensorData {
   float ax;
   float ay;
   float az;
+  // Calibrated gyroscope rate in °/s, body frame. BNO085 SH2_GYROSCOPE_CALIBRATED
+  // applies on-chip bias correction, so this is bias-free for steady operation.
+  float gx;
+  float gy;
+  float gz;
   bool  valid;             // false if the read failed / no fresh report
 };
 

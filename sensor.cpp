@@ -5,9 +5,11 @@
 //  Reports enabled:
 //    - SH2_ARVR_STABILIZED_RV   (9-axis fused quaternion, magnetometer ON)
 //    - SH2_LINEAR_ACCELERATION  (m/s², gravity already removed by the BNO085)
+//    - SH2_GYROSCOPE_CALIBRATED (rad/s, on-chip ZRO bias correction applied)
 //
 //  IMPORTANT: do NOT switch to SH2_GAME_ROTATION_VECTOR — yaw will drift within
 //  ~30 s and break golf hip-rotation and ankle-pronation tracking.
+//  Use SH2_GYROSCOPE_CALIBRATED, not _UNCALIBRATED — we want bias-corrected dps.
 // ============================================================================
 #include "sensor.h"
 #include "config.h"
@@ -22,8 +24,10 @@ static sh2_SensorValue_t sensorValue;
 // Last-known good values, refreshed when a new report arrives.
 static float last_qw = 1.0f, last_qx = 0.0f, last_qy = 0.0f, last_qz = 0.0f;
 static float last_ax = 0.0f, last_ay = 0.0f, last_az = 0.0f;
+static float last_gx = 0.0f, last_gy = 0.0f, last_gz = 0.0f;
 static bool  has_quat  = false;
 static bool  has_accel = false;
+static bool  has_gyro  = false;
 
 // Configure the two reports we need at SAMPLE_RATE_HZ.
 static bool enableReports() {
@@ -36,6 +40,10 @@ static bool enableReports() {
     Serial.println(F("[sensor] failed to enable LINEAR_ACCELERATION"));
     return false;
   }
+  if (!bno08x.enableReport(SH2_GYROSCOPE_CALIBRATED, REPORT_INTERVAL_US)) {
+    Serial.println(F("[sensor] failed to enable GYROSCOPE_CALIBRATED"));
+    return false;
+  }
   return true;
 }
 
@@ -46,14 +54,14 @@ bool sensorInit() {
     return false;
   }
   if (!enableReports()) return false;
-  Serial.println(F("[sensor] BNO085 ready (9-axis ARVR + linear accel)"));
+  Serial.println(F("[sensor] BNO085 ready (9-axis ARVR + linear accel + calibrated gyro)"));
   return true;
 }
 
 void sensorPrintInfo() {
   // Adafruit_BNO08x exposes product IDs only after begin_I2C; nothing to print
   // here without diving into sh2.h. Kept as a hook for future diagnostics.
-  Serial.println(F("[sensor] BNO085 @ I2C 0x4A, ARVR_STABILIZED_RV @ 100 Hz"));
+  Serial.println(F("[sensor] BNO085 @ I2C 0x4A, ARVR_STABILIZED_RV + LINEAR_ACCEL + GYRO_CAL @ 100 Hz"));
 }
 
 SensorData getSensorAngles() {
@@ -84,6 +92,16 @@ SensorData getSensorAngles() {
         has_accel = true;
         break;
       }
+      case SH2_GYROSCOPE_CALIBRATED: {
+        // SH2 reports gyro in rad/s; SensorData stores °/s so the BLE layer
+        // doesn't need to know the sensor's native units.
+        static const float RAD_TO_DEG = 57.2957795f;
+        last_gx = sensorValue.un.gyroscope.x * RAD_TO_DEG;
+        last_gy = sensorValue.un.gyroscope.y * RAD_TO_DEG;
+        last_gz = sensorValue.un.gyroscope.z * RAD_TO_DEG;
+        has_gyro = true;
+        break;
+      }
       default:
         break;
     }
@@ -91,10 +109,11 @@ SensorData getSensorAngles() {
 
   // Only emit a sample once we've seen at least one of each report,
   // so the first BLE packet isn't full of zeros.
-  if (has_quat && has_accel) {
+  if (has_quat && has_accel && has_gyro) {
     out.timestamp_ms = millis();
     out.qw = last_qw; out.qx = last_qx; out.qy = last_qy; out.qz = last_qz;
     out.ax = last_ax; out.ay = last_ay; out.az = last_az;
+    out.gx = last_gx; out.gy = last_gy; out.gz = last_gz;
     out.valid = true;
   }
   return out;
