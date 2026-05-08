@@ -44,7 +44,12 @@ static const uint32_t I2C_CLOCK_HZ        = 400000;   // fast mode required for 
 // ---------------------------------------------------------------------------
 //  XIAO nRF52840 wiring: PIN_VBAT measures VBAT through internal divider,
 //  P0_14 must be driven LOW to enable the divider, AR_INTERNAL_3_0 reference.
-static const uint8_t  BATTERY_ENABLE_PIN  = 14;       // P0.14, LOW = divider ON
+//
+//  IMPORTANT: use the BSP-provided P0_14 macro, NOT a raw pin number 14.
+//  In the Seeed XIAO nRF52840 Arduino core, "14" as an Arduino pin number
+//  resolves to a different physical pin — only P0_14 maps to the actual nRF
+//  GPIO that controls the battery voltage divider.
+#define BATTERY_ENABLE_PIN  P0_14             // P0.14, LOW = divider ON
 static const float    ADC_REF_VOLTAGE     = 3.0f;     // AR_INTERNAL_3_0
 static const float    VBAT_DIVIDER_RATIO  = (1510.0f + 510.0f) / 510.0f;  // ≈ 3.96
 static const uint16_t ADC_RESOLUTION_BITS = 12;

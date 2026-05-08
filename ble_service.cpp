@@ -9,7 +9,20 @@
 #include "config.h"
 
 #include <ArduinoBLE.h>
-#include <nrf.h>
+
+// Access to NRF_FICR for chip-ID-based BLE name. The header path differs
+// between Seeed's two board packages — try both. NRF_FICR is the Nordic
+// factory information register block; available regardless of which header
+// gets pulled in, as long as one of them is found.
+#if __has_include(<nrf.h>)
+  #include <nrf.h>
+#elif __has_include(<nrf52840.h>)
+  #include <nrf52840.h>
+#elif __has_include("nrf.h")
+  #include "nrf.h"
+#else
+  #error "No nrf.h available — verify the Seeed nRF52 board package is installed"
+#endif
 
 // Service + characteristics. The sensor characteristic carries 22 bytes (v3)
 // per notify; ArduinoBLE will negotiate MTU automatically and split if needed.
@@ -57,6 +70,23 @@ static void onDisconnect(BLEDevice central) {
 }
 
 // ---------------------------------------------------------------------------
+//  Config characteristic write handler (scaffold for Sprint 4 — golf 200 Hz)
+// ---------------------------------------------------------------------------
+//  Convention: written byte = SAMPLE_RATE_HZ / 10 (e.g. 10 = 100 Hz, 20 = 200 Hz).
+//  Currently logs only — the actual rate change requires re-arming the BNO085
+//  reports (sensor.cpp::enableReports) and updating SAMPLE_PERIOD_MS at runtime.
+//  TODO Sprint 4: wire this up to sensor.cpp + main loop cadence.
+static void onConfigWrite(BLEDevice central, BLECharacteristic chr) {
+  if (chr.valueLength() < 1) return;
+  uint8_t requested = chr.value()[0];
+  uint16_t requestedHz = (uint16_t)requested * 10;
+  Serial.print(F("[ble] config write — requested "));
+  Serial.print(requestedHz);
+  Serial.println(F(" Hz (not applied yet — Sprint 4)"));
+  (void)central;
+}
+
+// ---------------------------------------------------------------------------
 //  Public API
 // ---------------------------------------------------------------------------
 bool bleInit() {
@@ -83,6 +113,9 @@ bool bleInit() {
 
   BLE.setEventHandler(BLEConnected,    onConnect);
   BLE.setEventHandler(BLEDisconnected, onDisconnect);
+
+  // Wire up config-char writes (scaffold — see onConfigWrite TODO Sprint 4)
+  configChar.setEventHandler(BLEWritten, onConfigWrite);
 
   if (!BLE.advertise()) {
     Serial.println(F("[ble] advertise() failed"));
@@ -164,6 +197,10 @@ void bleSendSensor(const SensorData& data, uint32_t session_start_ms) {
 
   // writeValue on a NOTIFY char queues a notify to subscribed centrals.
   sensorChar.writeValue(sensorPacket, SENSOR_PACKET_SIZE);
+  // Force flush — without this the stack can batch notifies on the negotiated
+  // connection interval, producing bursts at session start instead of a
+  // steady 100 Hz stream.
+  BLE.poll();
 }
 
 void bleUpdateBatteryPercent(uint8_t percent) {

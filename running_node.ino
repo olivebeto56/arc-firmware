@@ -43,8 +43,10 @@ static uint8_t readBatteryPercent() {
   analogReadResolution(ADC_RESOLUTION_BITS);
 
   // Discard one reading after switching reference (recommended by Nordic).
+  // Use a short non-blocking-ish settle (500 µs) instead of delay(2 ms) so we
+  // don't drop a 100 Hz sample every 10 s when the battery routine fires.
   (void)analogRead(PIN_VBAT);
-  delay(2);
+  delayMicroseconds(500);
   uint32_t raw = analogRead(PIN_VBAT);
 
   // raw -> volts at the ADC pin -> battery volts (un-divide).
