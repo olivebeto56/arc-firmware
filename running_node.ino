@@ -39,7 +39,16 @@ static uint8_t readBatteryPercent() {
   pinMode(BATTERY_ENABLE_PIN, OUTPUT);
   digitalWrite(BATTERY_ENABLE_PIN, LOW);
 
-  analogReference(AR_INTERNAL_3_0);
+  // The mbed-enabled Seeed core renames AR_INTERNAL_3_0 -> AR_INTERNAL_3V0.
+  // Use a portable selector so the firmware compiles on both Seeed cores.
+  #if defined(AR_INTERNAL_3V0)
+    analogReference(AR_INTERNAL_3V0);
+  #elif defined(AR_INTERNAL_3_0)
+    analogReference(AR_INTERNAL_3_0);
+  #else
+    #warning "No 3.0V internal reference available — battery readings will be inaccurate"
+    analogReference(AR_DEFAULT);
+  #endif
   analogReadResolution(ADC_RESOLUTION_BITS);
 
   // Discard one reading after switching reference (recommended by Nordic).

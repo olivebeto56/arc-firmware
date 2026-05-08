@@ -95,10 +95,12 @@ SensorData getSensorAngles() {
       case SH2_GYROSCOPE_CALIBRATED: {
         // SH2 reports gyro in rad/s; SensorData stores °/s so the BLE layer
         // doesn't need to know the sensor's native units.
-        static const float RAD_TO_DEG = 57.2957795f;
-        last_gx = sensorValue.un.gyroscope.x * RAD_TO_DEG;
-        last_gy = sensorValue.un.gyroscope.y * RAD_TO_DEG;
-        last_gz = sensorValue.un.gyroscope.z * RAD_TO_DEG;
+        // NOTE: avoid the name "RAD_TO_DEG" here — the mbed-enabled Seeed core
+        // defines it as a global macro in Common.h, which would clash.
+        static const float kRadToDeg = 57.2957795f;
+        last_gx = sensorValue.un.gyroscope.x * kRadToDeg;
+        last_gy = sensorValue.un.gyroscope.y * kRadToDeg;
+        last_gz = sensorValue.un.gyroscope.z * kRadToDeg;
         has_gyro = true;
         break;
       }
