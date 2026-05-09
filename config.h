@@ -50,7 +50,10 @@ static const uint32_t I2C_CLOCK_HZ        = 400000;   // fast mode required for 
 //  resolves to a different physical pin — only P0_14 maps to the actual nRF
 //  GPIO that controls the battery voltage divider.
 #define BATTERY_ENABLE_PIN  P0_14             // P0.14, LOW = divider ON
-static const float    ADC_REF_VOLTAGE     = 3.0f;     // AR_INTERNAL_3_0
+// NOTE: ADC reference voltage now lives in running_node.ino as BATTERY_ADC_VREF
+// because it depends on which Seeed board package is in use:
+//   - standard core   → 3.0 V (AR_INTERNAL_3_0)
+//   - mbed-enabled    → 3.6 V (default VDD reference, no analogReference call)
 static const float    VBAT_DIVIDER_RATIO  = (1510.0f + 510.0f) / 510.0f;  // ≈ 3.96
 static const uint16_t ADC_RESOLUTION_BITS = 12;
 static const uint16_t ADC_MAX             = (1 << ADC_RESOLUTION_BITS) - 1;

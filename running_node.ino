@@ -34,32 +34,55 @@ static bool     was_connected     = false;
 // ---------------------------------------------------------------------------
 //  Battery — read VBAT through the internal divider on the XIAO nRF52840
 // ---------------------------------------------------------------------------
+//  Two ADC paths depending on which Seeed nRF52 board package is installed:
+//
+//    - Standard "Seeed nRF52 Boards":
+//        Exposes AR_INTERNAL_3_0 / AR_DEFAULT — we pick the 3.0 V internal
+//        reference for accuracy (full LiPo range fits comfortably).
+//    - mbed-enabled "Seeed nRF52 mbed-enabled Boards" (current target):
+//        Does NOT expose those constants. Default ADC reference is 3.6 V
+//        (VDD with 1/4 prescaler, full-scale = 3.6 V). We just call
+//        analogRead() without setting a reference and adjust V_REF accordingly.
+//
+//  The right V_REF for the cuenta-a-volts conversion is selected at compile
+//  time from BATTERY_ADC_VREF below.
+//
+//  In all cases the on-board divider chain is enabled by driving P0_14 LOW.
+// ---------------------------------------------------------------------------
+
+#if defined(AR_INTERNAL_3V0) || defined(AR_INTERNAL_3_0)
+  // Standard Seeed core path — use precise 3.0 V internal reference.
+  static const float BATTERY_ADC_VREF = 3.0f;
+#else
+  // mbed-enabled core path — fall back to the default 3.6 V VDD reference.
+  static const float BATTERY_ADC_VREF = 3.6f;
+#endif
+
 static uint8_t readBatteryPercent() {
   // Enable the on-board voltage divider (P0.14 LOW = ON).
   pinMode(BATTERY_ENABLE_PIN, OUTPUT);
   digitalWrite(BATTERY_ENABLE_PIN, LOW);
 
-  // The mbed-enabled Seeed core renames AR_INTERNAL_3_0 -> AR_INTERNAL_3V0.
-  // Use a portable selector so the firmware compiles on both Seeed cores.
-  #if defined(AR_INTERNAL_3V0)
-    analogReference(AR_INTERNAL_3V0);
-  #elif defined(AR_INTERNAL_3_0)
-    analogReference(AR_INTERNAL_3_0);
-  #else
-    #warning "No 3.0V internal reference available — battery readings will be inaccurate"
-    analogReference(AR_DEFAULT);
-  #endif
+#if defined(AR_INTERNAL_3V0)
+  analogReference(AR_INTERNAL_3V0);
+#elif defined(AR_INTERNAL_3_0)
+  analogReference(AR_INTERNAL_3_0);
+#else
+  // mbed-enabled core: leave the ADC reference at its default (3.6 V VDD).
+  // Calling analogReference() with a wrong constant fails to compile here.
+#endif
+
   analogReadResolution(ADC_RESOLUTION_BITS);
 
   // Discard one reading after switching reference (recommended by Nordic).
-  // Use a short non-blocking-ish settle (500 µs) instead of delay(2 ms) so we
+  // Use a short non-blocking settle (500 µs) instead of delay(2 ms) so we
   // don't drop a 100 Hz sample every 10 s when the battery routine fires.
   (void)analogRead(PIN_VBAT);
   delayMicroseconds(500);
   uint32_t raw = analogRead(PIN_VBAT);
 
   // raw -> volts at the ADC pin -> battery volts (un-divide).
-  float v_adc  = (raw * ADC_REF_VOLTAGE) / (float)ADC_MAX;
+  float v_adc  = (raw * BATTERY_ADC_VREF) / (float)ADC_MAX;
   float v_bat  = v_adc * VBAT_DIVIDER_RATIO;
 
   // Linear map between empty and full.
